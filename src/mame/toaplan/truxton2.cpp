@@ -3,18 +3,18 @@
 
 #include "emu.h"
 
-#include "emupal.h"
-#include "screen.h"
-#include "speaker.h"
-#include "tilemap.h"
-
+#include "gp9001.h"
 #include "toaplan_coincounter.h"
 #include "toaplipt.h"
-#include "gp9001.h"
 
 #include "cpu/m68000/m68000.h"
 #include "sound/okim6295.h"
 #include "sound/ymopm.h"
+
+#include "emupal.h"
+#include "screen.h"
+#include "speaker.h"
+#include "tilemap.h"
 
 //#define TRUXTON2_STEREO       /* Uncomment to hear truxton2 music in stereo */
 
@@ -58,7 +58,6 @@ protected:
 
 	u32 screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
 	void create_tx_tilemap(int dx = 0, int dx_flipped = 0);
-	virtual void device_post_load() override;
 
 	void screen_vblank(int state);
 	void tx_gfxram_w(offs_t offset, u16 data, u16 mem_mask = ~0);
@@ -101,13 +100,6 @@ private:
   ---- ---x xxxx xxxx = X scroll for each line
 */
 
-void truxton2_state::device_post_load()
-{
-	if (m_tx_gfxram != nullptr)
-		m_gfxdecode->gfx(0)->mark_all_dirty();
-}
-
-
 TILE_GET_INFO_MEMBER(truxton2_state::get_text_tile_info)
 {
 	const u16 attrib = m_tx_videoram[tile_index];
@@ -137,7 +129,7 @@ void truxton2_state::tx_linescroll_w(offs_t offset, u16 data, u16 mem_mask)
 
 
 void truxton2_state::screen_vblank(int state)
-{	
+{
 	if (state) // rising edge
 	{
 		m_vdp->screen_eof();
@@ -318,7 +310,7 @@ static const gfx_layout truxton2_tx_tilelayout =
 
 
 static GFXDECODE_START( gfx )
-	GFXDECODE_ENTRY( nullptr, 0, truxton2_tx_tilelayout, 64*16, 64 )
+	GFXDECODE_RAM( nullptr, 0, truxton2_tx_tilelayout, 64*16, 64 )
 GFXDECODE_END
 
 
@@ -365,8 +357,6 @@ void truxton2_state::truxton2(machine_config &config)
 #endif
 }
 
-} // anonymous namespace
-
 ROM_START( truxton2 )
 	ROM_REGION( 0x080000, "maincpu", 0 )            /* Main 68K code */
 	/* program ROM is byte swapped ! */
@@ -379,5 +369,7 @@ ROM_START( truxton2 )
 	ROM_REGION( 0x80000, "oki", 0 )         /* ADPCM Samples */
 	ROM_LOAD( "tp024_2.bin", 0x00000, 0x80000, CRC(f2f6cae4) SHA1(bb4e8c36531bed97ced4696ca12fd40ede2531aa) )
 ROM_END
+
+} // anonymous namespace
 
 GAME( 1992, truxton2,    0,        truxton2,     truxton2,   truxton2_state, empty_init,    ROT270, "Toaplan",         "Truxton II / Tatsujin Oh",  MACHINE_SUPPORTS_SAVE )

@@ -3,15 +3,10 @@
 
 #include "emu.h"
 
-#include "emupal.h"
-#include "screen.h"
-#include "speaker.h"
-#include "tilemap.h"
-
+#include "gp9001.h"
 #include "toaplan_coincounter.h"
 #include "toaplan_v25_tables.h"
 #include "toaplipt.h"
-#include "gp9001.h"
 
 #include "cpu/m68000/m68000.h"
 #include "cpu/nec/v25.h"
@@ -19,6 +14,11 @@
 #include "machine/eepromser.h"
 #include "sound/okim6295.h"
 #include "sound/ymopm.h"
+
+#include "emupal.h"
+#include "screen.h"
+#include "speaker.h"
+#include "tilemap.h"
 
 /*
 Name        Board No      Maker         Game name
@@ -79,18 +79,17 @@ public:
 		, m_palette(*this, "palette")
 	{ }
 
-	void fixeight(machine_config &config);
-	void init_fixeight();
+	void fixeight(machine_config &config) ATTR_COLD;
+	void init_fixeight() ATTR_COLD;
 
 protected:
+	virtual void machine_reset() override ATTR_COLD;
 	virtual void video_start() override ATTR_COLD;
-
-	virtual void device_post_load() override;
 
 	void fixeight_68k_mem(address_map &map) ATTR_COLD;
 	void fixeight_v25_mem(address_map &map) ATTR_COLD;
 
-	void create_tx_tilemap(int dx = 0, int dx_flipped = 0);
+	void create_tx_tilemap(int dx = 0, int dx_flipped = 0) ATTR_COLD;
 
 	u32 screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
 	void screen_vblank(int state);
@@ -109,7 +108,7 @@ protected:
 	optional_shared_ptr<u16> m_tx_lineselect; // originals only
 	optional_shared_ptr<u16> m_tx_linescroll; // originals only
 	optional_shared_ptr<u16> m_tx_gfxram; // originals only
-	void reset(int state);
+	void reset_audiocpu(int state);
 
 	optional_shared_ptr<u8> m_shared_ram; // originals only - 8 bit RAM shared between 68K and sound CPU
 
@@ -132,10 +131,11 @@ public:
 		, m_okibank(*this, "okibank")
 	{ }
 
-	void fixeightbl(machine_config &config);
+	void fixeightbl(machine_config &config) ATTR_COLD;
 
-	void init_fixeightbl();
+	void init_fixeightbl() ATTR_COLD;
 
+protected:
 	virtual void video_start() override ATTR_COLD;
 
 	void fixeightbl_68k_mem(address_map &map) ATTR_COLD;
@@ -151,9 +151,16 @@ public:
 };
 
 
-void fixeight_state::reset(int state)
+void fixeight_state::machine_reset()
 {
-	m_audiocpu->pulse_input_line(INPUT_LINE_RESET, attotime::zero);
+	if (m_audiocpu)
+		sound_reset_w(0);
+}
+
+void fixeight_state::reset_audiocpu(int state)
+{
+	if (state)
+		sound_reset_w(0);
 }
 
 
@@ -273,12 +280,6 @@ void fixeight_state::tx_gfxram_w(offs_t offset, u16 data, u16 mem_mask)
 		COMBINE_DATA(&m_tx_gfxram[offset]);
 		m_gfxdecode->gfx(0)->mark_dirty(offset/32);
 	}
-}
-
-void fixeight_state::device_post_load()
-{
-	if (m_tx_gfxram != nullptr)
-		m_gfxdecode->gfx(0)->mark_all_dirty();
 }
 
 
@@ -503,7 +504,7 @@ static const gfx_layout truxton2_tx_tilelayout =
 
 
 static GFXDECODE_START( gfx )
-	GFXDECODE_ENTRY( nullptr, 0, truxton2_tx_tilelayout, 64*16, 64 )
+	GFXDECODE_RAM( nullptr, 0, truxton2_tx_tilelayout, 64*16, 64 )
 GFXDECODE_END
 
 static GFXDECODE_START( gfx_textrom )
@@ -515,7 +516,7 @@ void fixeight_state::fixeight(machine_config &config)
 	/* basic machine hardware */
 	M68000(config, m_maincpu, 16_MHz_XTAL);         // verified on PCB
 	m_maincpu->set_addrmap(AS_PROGRAM, &fixeight_state::fixeight_68k_mem);
-	m_maincpu->reset_cb().set(FUNC(fixeight_state::reset));
+	m_maincpu->reset_cb().set(FUNC(fixeight_state::reset_audiocpu));
 
 	v25_device &audiocpu(V25(config, m_audiocpu, 16_MHz_XTAL));           // NEC V25 type Toaplan marked CPU ???
 	audiocpu.set_addrmap(AS_PROGRAM, &fixeight_state::fixeight_v25_mem);

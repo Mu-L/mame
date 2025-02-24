@@ -631,10 +631,6 @@ void hyperstone_device::generate_divsu(drcuml_block &block, compiler_state &comp
 		UML_LOAD(block, I0, (void *)m_core->local_regs, I4, SIZE_DWORD, SCALE_x4);
 	}
 
-#ifndef PTR64
-	UML_DAND(block, I0, I0, 0x00000000ffffffffULL);
-#endif
-
 	if (DST_GLOBAL)
 	{
 		UML_LOAD(block, I1, (void *)m_core->global_regs, dst_code, SIZE_DWORD, SCALE_x4);
@@ -650,10 +646,6 @@ void hyperstone_device::generate_divsu(drcuml_block &block, compiler_state &comp
 		UML_LOAD(block, I2, (void *)m_core->local_regs, I6, SIZE_DWORD, SCALE_x4);
 	}
 
-#ifndef PTR64
-	UML_DAND(block, I2, I2, 0x00000000ffffffffULL);
-#endif
-
 	UML_DSHL(block, I1, I1, 32);
 	UML_DOR(block, I1, I1, I2);
 
@@ -665,6 +657,7 @@ void hyperstone_device::generate_divsu(drcuml_block &block, compiler_state &comp
 	{
 		UML_DTEST(block, I1, 0x8000000000000000LL);
 		UML_JMPc(block, uml::COND_NZ, no_result);
+		UML_DSEXT(block, I0, I0, SIZE_DWORD);
 	}
 
 	if (SIGNED)
@@ -878,7 +871,6 @@ void hyperstone_device::generate_sum(drcuml_block &block, compiler_state &compil
 
 #ifndef PTR64
 	UML_DAND(block, I1, I1, 0x00000000ffffffffULL);
-	UML_DAND(block, I2, I2, 0x00000000ffffffffULL);
 #endif
 
 	UML_DADD(block, I5, I1, I2);
@@ -973,7 +965,6 @@ void hyperstone_device::generate_cmp(drcuml_block &block, compiler_state &compil
 
 #ifndef PTR64
 	UML_DAND(block, I0, I0, 0x00000000ffffffffULL);
-	UML_DAND(block, I1, I1, 0x00000000ffffffffULL);
 #endif
 
 	UML_DSUB(block, I2, I1, I0); // tmp
@@ -1114,7 +1105,7 @@ void hyperstone_device::generate_add(drcuml_block &block, compiler_state &compil
 	if (SRC_GLOBAL)
 	{
 		if (src_code == SR_REGISTER)
-			UML_AND(block, I0, DRC_SR, 1);
+			UML_AND(block, I0, DRC_SR, C_MASK);
 		else
 			UML_LOAD(block, I0, (void *)m_core->global_regs, src_code, SIZE_DWORD, SCALE_x4);
 	}
@@ -1252,9 +1243,6 @@ void hyperstone_device::generate_subc(drcuml_block &block, compiler_state &compi
 		if (src_code != SR_REGISTER)
 		{
 			UML_LOAD(block, I2, (void *)m_core->global_regs, src_code, SIZE_DWORD, SCALE_x4);
-#ifndef PTR64
-			UML_DAND(block, I2, I2, 0x00000000ffffffffULL);
-#endif
 			UML_DADD(block, I0, I2, I0);
 		}
 	}
@@ -1263,9 +1251,6 @@ void hyperstone_device::generate_subc(drcuml_block &block, compiler_state &compi
 		UML_ADD(block, I2, I3, src_code);
 		UML_AND(block, I2, I2, 0x3f);
 		UML_LOAD(block, I2, (void *)m_core->local_regs, I2, SIZE_DWORD, SCALE_x4);
-#ifndef PTR64
-		UML_DAND(block, I2, I2, 0x00000000ffffffffULL);
-#endif
 		UML_DADD(block, I0, I2, I0);
 	}
 
@@ -1279,10 +1264,6 @@ void hyperstone_device::generate_subc(drcuml_block &block, compiler_state &compi
 		UML_AND(block, I4, I2, 0x3f);
 		UML_LOAD(block, I1, (void *)m_core->local_regs, I4, SIZE_DWORD, SCALE_x4);
 	}
-
-#ifndef PTR64
-	UML_DAND(block, I1, I1, 0x00000000ffffffffULL);
-#endif
 
 	UML_AND(block, I6, DRC_SR, Z_MASK);
 	UML_AND(block, I5, DRC_SR, ~(C_MASK | V_MASK | Z_MASK | N_MASK));
@@ -1343,7 +1324,7 @@ void hyperstone_device::generate_sub(drcuml_block &block, compiler_state &compil
 	if (SRC_GLOBAL)
 	{
 		if (src_code == SR_REGISTER)
-			UML_AND(block, I0, DRC_SR, 1);
+			UML_AND(block, I0, DRC_SR, C_MASK);
 		else
 			UML_LOAD(block, I0, (void *)m_core->global_regs, src_code, SIZE_DWORD, SCALE_x4);
 	}
@@ -1367,7 +1348,6 @@ void hyperstone_device::generate_sub(drcuml_block &block, compiler_state &compil
 
 #ifndef PTR64
 	UML_DAND(block, I0, I0, 0x00000000ffffffffULL);
-	UML_DAND(block, I1, I1, 0x00000000ffffffffULL);
 #endif
 
 	UML_DSUB(block, I2, I1, I0);
@@ -1435,7 +1415,7 @@ void hyperstone_device::generate_subs(drcuml_block &block, compiler_state &compi
 	if (SRC_GLOBAL)
 	{
 		if (src_code == SR_REGISTER)
-			UML_AND(block, I0, DRC_SR, 1);
+			UML_AND(block, I0, DRC_SR, C_MASK);
 		else
 			UML_LOAD(block, I0, (void *)m_core->global_regs, src_code, SIZE_DWORD, SCALE_x4);
 	}
@@ -1525,14 +1505,13 @@ void hyperstone_device::generate_addc(drcuml_block &block, compiler_state &compi
 	{
 		if (src_code == SR_REGISTER)
 		{
-			UML_AND(block, I0, DRC_SR, 1);
+			UML_AND(block, I0, DRC_SR, C_MASK);
 		}
 		else
 		{
 			UML_LOAD(block, I0, (void *)m_core->global_regs, src_code, SIZE_DWORD, SCALE_x4);
-			UML_AND(block, I1, DRC_SR, 1);
+			UML_AND(block, I1, DRC_SR, C_MASK);
 #ifndef PTR64
-			UML_DAND(block, I0, I0, 0x00000000ffffffffULL);
 			UML_DAND(block, I1, I1, 0x00000000ffffffffULL);
 #endif
 			UML_DADD(block, I0, I0, I1);
@@ -1543,9 +1522,8 @@ void hyperstone_device::generate_addc(drcuml_block &block, compiler_state &compi
 		UML_ADD(block, I1, I3, src_code);
 		UML_AND(block, I1, I1, 0x3f);
 		UML_LOAD(block, I0, (void *)m_core->local_regs, I1, SIZE_DWORD, SCALE_x4);
-		UML_AND(block, I1, DRC_SR, 1);
+		UML_AND(block, I1, DRC_SR, C_MASK);
 #ifndef PTR64
-		UML_DAND(block, I0, I0, 0x00000000ffffffffULL);
 		UML_DAND(block, I1, I1, 0x00000000ffffffffULL);
 #endif
 		UML_DADD(block, I0, I0, I1);
@@ -1561,10 +1539,6 @@ void hyperstone_device::generate_addc(drcuml_block &block, compiler_state &compi
 		UML_AND(block, I3, I3, 0x3f);
 		UML_LOAD(block, I1, (void *)m_core->local_regs, I3, SIZE_DWORD, SCALE_x4);
 	}
-
-#ifndef PTR64
-	UML_DAND(block, I1, I1, 0x00000000ffffffffULL);
-#endif
 
 	UML_DADD(block, I2, I0, I1);
 
@@ -1631,10 +1605,6 @@ void hyperstone_device::generate_neg(drcuml_block &block, compiler_state &compil
 		UML_AND(block, I1, I2, 0x3f);
 		UML_LOAD(block, I0, (void *)m_core->local_regs, I1, SIZE_DWORD, SCALE_x4);
 	}
-
-#ifndef PTR64
-	UML_DAND(block, I0, I0, 0x00000000ffffffffULL);
-#endif
 
 	UML_DSUB(block, I4, 0, I0);
 	UML_SUB(block, I2, 0, I0);
@@ -2019,11 +1989,6 @@ void hyperstone_device::generate_cmpi(drcuml_block &block, compiler_state &compi
 
 	UML_AND(block, DRC_SR, DRC_SR, ~(V_MASK | Z_MASK | N_MASK | C_MASK));
 
-#ifndef PTR64
-	UML_DAND(block, I1, I1, 0x00000000ffffffffULL);
-	UML_DAND(block, I2, I2, 0x00000000ffffffffULL);
-#endif
-
 	UML_DSUB(block, I0, I2, I1);
 
 	int no_v;
@@ -2161,11 +2126,6 @@ void hyperstone_device::generate_addi(drcuml_block &block, compiler_state &compi
 		UML_OR(block, I3, I3, I4);
 		UML_AND(block, I1, DRC_SR, I3);
 	}
-
-#ifndef PTR64
-	UML_DAND(block, I0, I0, 0x00000000ffffffffULL);
-	UML_DAND(block, I1, I1, 0x00000000ffffffffULL);
-#endif
 
 	UML_DADD(block, I3, I0, I1);
 
@@ -2507,10 +2467,6 @@ void hyperstone_device::generate_shrdi(drcuml_block &block, compiler_state &comp
 	UML_AND(block, I6, I2, 0x3f);
 	UML_LOAD(block, I2, (void *)m_core->local_regs, I6, SIZE_DWORD, SCALE_x4); // I1 = sregf
 
-#ifndef PTR64
-	UML_DAND(block, I2, I2, 0x00000000ffffffff);
-#endif
-
 	UML_DSHL(block, I0, I0, 32);
 	UML_DOR(block, I2, I2, I0);
 
@@ -2566,10 +2522,6 @@ void hyperstone_device::generate_shrd(drcuml_block &block, compiler_state &compi
 	UML_ADD(block, I2, I3, dstf_code);
 	UML_AND(block, I5, I2, 0x3f);
 	UML_LOAD(block, I1, (void *)m_core->local_regs, I5, SIZE_DWORD, SCALE_x4);
-
-#ifndef PTR64
-	UML_DAND(block, I1, I1, 0x00000000ffffffff);
-#endif
 
 	UML_DSHL(block, I2, I0, 32);
 	UML_DOR(block, I0, I1, I2);
@@ -2727,10 +2679,6 @@ void hyperstone_device::generate_sardi(drcuml_block &block, compiler_state &comp
 	UML_AND(block, I5, I2, 0x3f);
 	UML_LOAD(block, I1, (void *)m_core->local_regs, I5, SIZE_DWORD, SCALE_x4);
 
-#ifndef PTR64
-	UML_DAND(block, I1, I1, 0x00000000ffffffff);
-#endif
-
 	UML_DSHL(block, I2, I0, 32);
 	UML_DOR(block, I0, I1, I2);
 
@@ -2786,10 +2734,6 @@ void hyperstone_device::generate_sard(drcuml_block &block, compiler_state &compi
 	UML_ADD(block, I2, I3, dstf_code);
 	UML_AND(block, I5, I2, 0x3f);
 	UML_LOAD(block, I1, (void *)m_core->local_regs, I5, SIZE_DWORD, SCALE_x4);
-
-#ifndef PTR64
-	UML_DAND(block, I1, I1, 0x00000000ffffffff);
-#endif
 
 	UML_DSHL(block, I2, I0, 32);
 	UML_DOR(block, I0, I1, I2);
@@ -2945,10 +2889,6 @@ void hyperstone_device::generate_shldi(drcuml_block &block, compiler_state &comp
 	UML_AND(block, I3, I3, 0x3f); // I3: dstf_code
 	UML_LOAD(block, I1, (void *)m_core->local_regs, I3, SIZE_DWORD, SCALE_x4); // I1: low_order
 
-#ifndef PTR64
-	UML_DAND(block, I1, I1, 0x00000000ffffffff);
-#endif
-
 	UML_DSHL(block, I0, I6, 32);
 	UML_DOR(block, I0, I0, I1); // I0: val, I1 free after this point
 
@@ -3018,10 +2958,6 @@ void hyperstone_device::generate_shld(drcuml_block &block, compiler_state &compi
 	UML_ADD(block, I3, I4, dstf_code);
 	UML_AND(block, I3, I3, 0x3f); // I3: dstf_code
 	UML_LOAD(block, I1, (void *)m_core->local_regs, I3, SIZE_DWORD, SCALE_x4); // I1: low_order
-
-#ifndef PTR64
-	UML_DAND(block, I1, I1, 0x00000000ffffffff);
-#endif
 
 	UML_DSHL(block, I0, I6, 32);
 	UML_DOR(block, I0, I0, I1); // I0: val, I1 free after this point

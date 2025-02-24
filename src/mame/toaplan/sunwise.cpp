@@ -3,14 +3,9 @@
 
 #include "emu.h"
 
+#include "gp9001.h"
 #include "toaplan_coincounter.h"
 #include "toaplipt.h"
-#include "gp9001.h"
-
-#include "emupal.h"
-#include "screen.h"
-#include "speaker.h"
-#include "tilemap.h"
 
 #include "cpu/m68000/m68000.h"
 #include "machine/nvram.h"
@@ -18,12 +13,18 @@
 #include "machine/upd4992.h"
 #include "sound/okim6295.h"
 
+#include "emupal.h"
+#include "screen.h"
+#include "speaker.h"
+#include "tilemap.h"
+
 /*****************************************************************************
 
 Name        Board No      Maker         Game name
 ----------------------------------------------------------------------------
-pwrkick     SW931201      Sunwise       Power Kick
-burgkids    SW931201      Sunwise       Burger Kids
+pwrkick     SW931201-1    Sunwise       Power Kick
+burgkids    SW931201-1    Sunwise       Burger Kids
+pyutakun    SW931201-1    Sunwise       Pyuuta-kun
 othldrby    S951060-VGP   Sunwise       Othello Derby
 
 
@@ -60,13 +61,15 @@ public:
 protected:
 	virtual void video_start() override ATTR_COLD;
 
-	void othldrby_68k_mem(address_map &map) ATTR_COLD;
+	void common_mem(address_map &map) ATTR_COLD;
 	void pwrkick_68k_mem(address_map &map) ATTR_COLD;
+	void othldrby_68k_mem(address_map &map) ATTR_COLD;
 
 	u32 screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
 	void screen_vblank(int state);
 
 	void sw_oki_bankswitch_w(u8 data);
+
 private:
 	void pwrkick_coin_w(u8 data);
 	void pwrkick_coin_lockout_w(u8 data);
@@ -281,6 +284,15 @@ static INPUT_PORTS_START( burgkids )
 INPUT_PORTS_END
 
 
+static INPUT_PORTS_START( pyutakun )
+	PORT_INCLUDE( burgkids )
+
+	PORT_MODIFY("IN1")
+	PORT_BIT( 0x02, IP_ACTIVE_HIGH, IPT_BUTTON1 )
+	PORT_BIT( 0x04, IP_ACTIVE_HIGH, IPT_BUTTON2 )
+	PORT_BIT( 0x08, IP_ACTIVE_HIGH, IPT_BUTTON3 )
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( 2b )
 	PORT_START("IN1")
 	TOAPLAN_JOY_UDLR_2_BUTTONS( 1 )
@@ -393,7 +405,7 @@ void sunwise_state::pwrkick_coin_lockout_w(u8 data)
 }
 
 
-void sunwise_state::pwrkick_68k_mem(address_map &map)
+void sunwise_state::common_mem(address_map &map)
 {
 	map(0x000000, 0x07ffff).rom();
 	map(0x100000, 0x103fff).ram().share("nvram"); // Only 10022C-10037B is actually saved as NVRAM
@@ -407,33 +419,27 @@ void sunwise_state::pwrkick_68k_mem(address_map &map)
 	map(0x700000, 0x700001).r(m_vdp, FUNC(gp9001vdp_device::vdpcount_r));
 	map(0x700004, 0x700005).portr("DSWA");
 	map(0x700008, 0x700009).portr("DSWB");
+	map(0x70001c, 0x70001d).portr("SYS");
+	map(0x700031, 0x700031).w(FUNC(sunwise_state::sw_oki_bankswitch_w));
+}
+
+void sunwise_state::pwrkick_68k_mem(address_map &map)
+{
+	common_mem(map);
+
 	map(0x70000c, 0x70000d).portr("IN1");
 	map(0x700014, 0x700015).portr("IN2");
 	map(0x700018, 0x700019).portr("DSWC");
-	map(0x70001c, 0x70001d).portr("SYS");
-	map(0x700031, 0x700031).w(FUNC(sunwise_state::sw_oki_bankswitch_w));
 	map(0x700035, 0x700035).w(FUNC(sunwise_state::pwrkick_coin_w));
 	map(0x700039, 0x700039).w(FUNC(sunwise_state::pwrkick_coin_lockout_w));
 }
 
 void sunwise_state::othldrby_68k_mem(address_map &map)
 {
-	map(0x000000, 0x07ffff).rom();
-	map(0x100000, 0x103fff).ram().share("nvram"); // Only 10331E-103401 is actually saved as NVRAM
-	map(0x104000, 0x10ffff).ram();
+	common_mem(map);
 
-	map(0x200000, 0x20000f).rw(m_rtc, FUNC(upd4992_device::read), FUNC(upd4992_device::write)).umask16(0x00ff);
-	map(0x300000, 0x30000d).rw(m_vdp, FUNC(gp9001vdp_device::read), FUNC(gp9001vdp_device::write));
-	map(0x400000, 0x400fff).ram().w(m_palette, FUNC(palette_device::write16)).share("palette");
-	map(0x600001, 0x600001).rw(m_oki, FUNC(okim6295_device::read), FUNC(okim6295_device::write));
-
-	map(0x700000, 0x700001).r(m_vdp, FUNC(gp9001vdp_device::vdpcount_r));
-	map(0x700004, 0x700005).portr("DSWA");
-	map(0x700008, 0x700009).portr("DSWB");
 	map(0x70000c, 0x70000d).portr("IN1");
 	map(0x700010, 0x700011).portr("IN2");
-	map(0x70001c, 0x70001d).portr("SYS");
-	map(0x700031, 0x700031).w(FUNC(sunwise_state::sw_oki_bankswitch_w));
 	map(0x700035, 0x700035).w("coincounter", FUNC(toaplan_coincounter_device::coin_w));
 }
 
@@ -561,7 +567,7 @@ NOTE: This PCB uses an 8-Liner style edge connector
         MB3771 Voltage monitor
         BT1 - CR2550 3Volt battery
 
-NOTE: Sunwise's S951060-VGP PCB uses identical componenets to the SW931201 but has a standard JAMMA connector
+NOTE: Sunwise's S951060-VGP PCB uses identical components to the SW931201 but has a standard JAMMA connector
 */
 
 ROM_START( burgkids ) // Sunwise SW931201-1 PCB - 8-liner connections
@@ -574,6 +580,18 @@ ROM_START( burgkids ) // Sunwise SW931201-1 PCB - 8-liner connections
 
 	ROM_REGION( 0x80000, "oki", ROMREGION_ERASE00 )
 	ROM_LOAD( "ffk4.u33", 0x000000, 0x080000,  CRC(3b032d4f) SHA1(69056bf205aadf6c9fee56ce396b11a5187caa03) )
+ROM_END
+
+ROM_START( pyutakun ) // Sunwise SW931201-1 PCB - 8-liner connections
+	ROM_REGION( 0x80000, "maincpu", 0 )
+	ROM_LOAD16_WORD_SWAP( "sunwise_p1.u61", 0x00000, 0x80000, CRC(00907713) SHA1(0822044bcf476b3e8aaba752e503ee79459b34ed) )
+
+	ROM_REGION( 0x100000, "gp9001", 0 )
+	ROM_LOAD( "sunwise_p2.u26", 0x00000, 0x80000, CRC(180b8b13) SHA1(4a317bd0825f4e4383293220e775c0f807cdd80f) )
+	ROM_LOAD( "sunwise_p3.u27", 0x80000, 0x80000, CRC(a23ccb8e) SHA1(5f2f23fa86817ff491058123d775ffebd7e98dee) )
+
+	ROM_REGION( 0x40000, "oki", 0 )
+	ROM_LOAD( "sunwise_p4.u33", 0x00000, 0x40000, CRC(b1c5a8bc) SHA1(aa18165a9214f9ed0969da073e4b6092be3c5c1a) )
 ROM_END
 
 ROM_START( othldrby ) // Sunwise S951060-VGP PCB - JAMMA compliant (components identical to Sunwise SW931201-1 PCB)
@@ -592,4 +610,5 @@ ROM_END
 
 GAME( 1994, pwrkick,     0,        pwrkick,    pwrkick,    sunwise_state,  empty_init,      ROT0,   "Sunwise",  "Power Kick (Japan)",    0 )
 GAME( 1995, burgkids,    0,        pwrkick,    burgkids,   sunwise_state,  empty_init,      ROT0,   "Sunwise",  "Burger Kids (Japan)",   0 )
+GAME( 1995, pyutakun,    0,        pwrkick,    pyutakun,   sunwise_state,  empty_init,      ROT0,   "Sunwise",  "Pyuuta-kun (Japan)",    0 )
 GAME( 1995, othldrby,    0,        othldrby,   othldrby,   sunwise_state,  empty_init,      ROT0,   "Sunwise",  "Othello Derby (Japan)", 0 )

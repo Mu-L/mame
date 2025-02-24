@@ -18,6 +18,8 @@
 #include "imagedev/floppy.h"
 #include "machine/s2350.h"
 
+#include "formats/h17disk.h"
+
 
 #define LOG_REG   (1U << 1) // Register setup
 #define LOG_LINES (1U << 2) // Control lines
@@ -39,6 +41,8 @@
 #define FUNCNAME __PRETTY_FUNCTION__
 #endif
 
+namespace {
+
 class heath_h17_fdc_device : public device_t, public device_h89bus_right_card_interface
 {
 public:
@@ -49,7 +53,7 @@ public:
 	virtual void write(u8 select_lines, u8 offset, u8 data) override;
 	virtual u8 read(u8 select_lines, u8 offset) override;
 
-	void side_select_w(int state);
+	[[maybe_unused]] void side_select_w(int state);
 
 protected:
 	static constexpr u8 MAX_FLOPPY_DRIVES = 3;
@@ -61,6 +65,7 @@ protected:
 	void ctrl_w(u8 val);
 	u8   floppy_status_r();
 
+	static void floppy_formats(format_registration &fr);
 	void set_floppy(floppy_image_device *floppy);
 	void step_w(int state);
 	void dir_w(int state);
@@ -338,6 +343,11 @@ TIMER_DEVICE_CALLBACK_MEMBER(heath_h17_fdc_device::tx_timer_cb)
 	m_s2350->tcp_w();
 }
 
+void heath_h17_fdc_device::floppy_formats(format_registration &fr)
+{
+	fr.add(FLOPPY_H17D_FORMAT);
+}
+
 void heath_h17_fdc_device::device_add_mconfig(machine_config &config)
 {
 	S2350(config, m_s2350, 0);
@@ -346,7 +356,7 @@ void heath_h17_fdc_device::device_add_mconfig(machine_config &config)
 	for (int i = 0; i < MAX_FLOPPY_DRIVES; i++)
 	{
 		// TODO -> add (and define) heath hard-sectored floppy formats.
-		FLOPPY_CONNECTOR(config, m_floppies[i], h17_floppies, "ssdd", floppy_image_device::default_fm_floppy_formats);
+		FLOPPY_CONNECTOR(config, m_floppies[i], h17_floppies, "ssdd", heath_h17_fdc_device::floppy_formats);
 		m_floppies[i]->enable_sound(true);
 	}
 
@@ -359,5 +369,7 @@ void heath_h17_fdc_device::sync_character_received(int state)
 
 	m_sync_char_received = bool(!BIT(state, 0));
 }
+
+} // anonymous namespace
 
 DEFINE_DEVICE_TYPE_PRIVATE(H89BUS_H_17_FDC, device_h89bus_right_card_interface, heath_h17_fdc_device, "h89_h17_fdc", "Heath H-17 Hard-sectored Controller (H-88-1)");
